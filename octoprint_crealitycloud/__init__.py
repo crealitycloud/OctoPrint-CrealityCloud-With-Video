@@ -1,22 +1,22 @@
 # coding=utf-8
 from __future__ import absolute_import
 
+import io
+import json
 import logging
 import os
-import json
-import io
 import re
 
 import octoprint.plugin
-from flask import jsonify, render_template, request, Response
+from flask import Response, jsonify, render_template, request
 from octoprint.events import Events
 from octoprint.server import admin_permission
-from flask import request
 
 from .crealitycloud import CrealityCloud
 from .cxhttp import CrealityAPI
 from .klipper_auto_configuration import auto_klipper
 from .recorder import Recorder
+
 
 class CrealitycloudPlugin(
     octoprint.plugin.StartupPlugin,
@@ -90,7 +90,7 @@ class CrealitycloudPlugin(
                 "repo": "OctoPrint-Crealitycloud",
                 "current": self._plugin_version,
                 # update method: pip
-                "pip": "https://github.com/crealitycloud/OctoPrint-Crealitycloud/archive/{target_version}.zip",
+                "pip": "https://github.com/crealitycloud/OctoPrint-CrealityCloud-With-Video/archive/{target_version}.zip",
             }
         }
 
