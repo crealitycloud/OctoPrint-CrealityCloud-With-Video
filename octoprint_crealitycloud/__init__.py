@@ -87,7 +87,7 @@ class CrealitycloudPlugin(
                 # version check: github repository
                 "type": "github_release",
                 "user": "crealitycloud",
-                "repo": "OctoPrint-Crealitycloud",
+                "repo": "OctoPrint-Crealitycloud-With-Video",
                 "current": self._plugin_version,
                 # update method: pip
                 "pip": "https://github.com/crealitycloud/OctoPrint-CrealityCloud-With-Video/archive/{target_version}.zip",
