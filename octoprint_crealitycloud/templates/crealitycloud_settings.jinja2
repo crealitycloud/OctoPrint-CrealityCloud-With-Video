@@ -1,0 +1,39 @@
+<div class="container_fluid" id="bindPage_success" data-bind="text: activedMsg, visible: isAcitived()">
+</div>
+
+<div data-bind="visible: !isAcitived()">
+  <br>
+  <div>Please download the Creality Cloud APP to get the Key file.</div>
+  <br>
+  <div><a target="view_window" data-bind="attr:{href:appdownloadUrl}">Download the Creality Cloud app</a></div>
+  <br>
+  <div>Click the button below to upload the Key file.</div>
+  <br>
+  <span class="btn fileinput-button">
+    <span>{{ _('Browse...') }}</span>
+    <input id="token_file_input" type="file" class="settings_token_input" accept=".tk">
+  </span>
+</div>
+
+<br>
+<br>
+<label><input name="using klipper" type="checkbox" data-bind="click: clickKlipper,checked:checkKlipper" />use
+  klipper</label>
+
+<div id="klipper_header" data-bind="visible: Klipperable()">
+  <p>
+  <h3>Klipper Auto Configuration</h3>
+  </p>
+  <p>
+  <h5>Select Your Printer</h5>
+  </p>
+  <select id="model"
+    data-bind="options: selectData,optionsText: 'model', optionsValue:'id',value: selectmodelData, optionsCaption: 'Select...',event:{change:changemodel}">
+  </select>
+  <p> </p><button id="confirm" data-bind="enable:allowconfirm,click:clickconfirm">confirm</button>
+  <br>
+  <br>
+  <button id="downfw" data-bind="enable:allowdownfw,click:fwdown">
+    Download the Klipper firmware
+  </button>
+</div>
