@@ -17,10 +17,18 @@
 
 <br>
 <br>
-<label><input name="using klipper" type="checkbox" data-bind="click: clickKlipper,checked:checkKlipper" />use
+<label><input id="using klipper" type="checkbox" data-bind="click: clickKlipper,checked:checkKlipper" />use
   klipper</label>
 
+<style>
+  .warning{
+    color: #FF0000; 
+  }
+</style>
+
 <div id="klipper_header" data-bind="visible: Klipperable()">
+  <br>
+  <h4 class="warning">This is a test feature. Please make sure you can roll back the firmware.</h4>
   <p>
   <h3>Klipper Auto Configuration</h3>
   </p>
@@ -36,4 +44,24 @@
   <button id="downfw" data-bind="enable:allowdownfw,click:fwdown">
     Download the Klipper firmware
   </button>
+  <p>
+  <h3>Configuring OctoPrint to use Klipper</h3>
+  <p>
+  The OctoPrint web server needs to be configured to communicate with the Klipper host software. Using a web browser, configure the following items:
+  <br>
+  <br>
+  Navigate to the <b>Settings tab</b> (the wrench icon at the top of the page). Under <b>"Serial Connection"</b> in <b>"Additional serial ports"</b> add <b>"/tmp/printer"</b>. Then click <b>"Save"</b>.
+  <br>
+  <br>
+  Enter the Settings tab again and under <b>"Serial Connection"</b> change the <b>"Serial Port"</b> setting to <b>"/tmp/printer"</b>.
+  <br>
+  <br>
+  In the <b>Settings tab</b>, navigate to the <b>"Behavior"</b> sub-tab and select the <b>"Cancel any ongoing prints but stay connected to the printer"</b> option. Click <b>"Save"</b>.
+  <br>
+  <br>
+  From the main page, under the <b>"Connection"</b> section (at the top left of the page) make sure the <b>"Serial Port"</b> is set to <b>"/tmp/printer"</b> and click <b>"Connect"</b>. (If "/tmp/printer" is not an available selection then try reloading the page.)
+  <br>
+  <br>
+  Once connected, navigate to the "Terminal" tab and type "status" (without the quotes) into the command entry box and click "Send". The terminal window will likely report there is an error opening the config file - that means OctoPrint is successfully communicating with Klipper. Proceed to the next section.
+  </p>
 </div>
