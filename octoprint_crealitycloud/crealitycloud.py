@@ -285,6 +285,9 @@ class CrealityCloud(object):
             self._aliprinter.connect = 0
             if os.path.exists("/dev/video0"):
                 self._aliprinter.video = 1
+                self.video_start()
+            else:
+                self._aliprinter.video = 0
 
         elif event == Events.FIRMWARE_DATA:
             if "MACHINE_TYPE" in payload["data"]:
