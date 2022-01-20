@@ -13,7 +13,7 @@ Creality Cloud plugin needs to be installed in the OctoPrint interface so that y
 Creality Cloud Plugin:
 
 
-- [https://github.com/crealitycloud/OctoPrint-Crealitycloud/archive/master.zip](https://github.com/crealitycloud/OctoPrint-Crealitycloud/archive/master.zip)
+- [https://github.com/crealitycloud/OctoPrint-CrealityCloud-With-Video/archive/master.zip](https://github.com/crealitycloud/OctoPrint-Crealitycloud/archive/master.zip)
 
 
 
