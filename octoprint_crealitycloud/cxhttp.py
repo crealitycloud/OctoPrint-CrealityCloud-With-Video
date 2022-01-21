@@ -24,7 +24,7 @@ class CrealityAPI(object):
         r = random.random() % (99999 - 10000) + 10000
         return "Raspberry" + str(time.tm_sec) + str(10) + str(r)  # time.tvm_usec
 
-    def getconfig(slef,token):
+    def getconfig(self,token):
         home_url = "https://model-admin.crealitygroup.com/api/cxy/v2/device/user/importDevice"
         oversea_url = "https://model-admin2.creality.com/api/cxy/v2/device/user/importDevice"
         headers = {
