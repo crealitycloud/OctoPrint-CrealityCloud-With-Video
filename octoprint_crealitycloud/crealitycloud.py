@@ -37,7 +37,7 @@ class CrealityCloud(object):
         self._printer_disconnect = False
 
         self._upload_timer = RepeatedTimer(2,self._upload_timing,run_first=True)
-        self._upload_ip_timer = RepeatedTimer(30,self._upload_ip_timing,run_first=False)
+        self._upload_ip_timer = RepeatedTimer(10,self._upload_ip_timing,run_first=False)
         self._send_M27_timer = RepeatedTimer(10,self._send_M27_timing,run_first=False)
 
         self.connect_aliyun()
@@ -56,22 +56,22 @@ class CrealityCloud(object):
         self._aliprinter.printer.commands(['M27C'])
 
     def _upload_ip_timing(self):
-        self._aliprinter.ipAddress
-        self._upload_ip_timer.cancel()
+            self._aliprinter.ipAddress
+            self._upload_ip_timer.cancel()
 
     def _upload_timing(self):
             
+        #upload box verson
+        if self._aliprinter.bool_boxVersion != True:
+            self._aliprinter.boxVersion = self._aliprinter._boxVersion
+            self._aliprinter.bool_boxVersion = True
+
         if self._aliprinter.printer.is_closed_or_error():
             if not self._printer_disconnect:
                 self._logger.info('disconnect printer or printer error')
                 self._printer_disconnect = True
             return
-
         self._printer_disconnect = False
-        #upload box verson
-        if self._aliprinter.bool_boxVersion != True:
-            self._aliprinter.boxVersion = self._aliprinter._boxVersion
-            self._aliprinter.bool_boxVersion = True
 
         #report curFeedratePct
         if self._aliprinter._str_curFeedratePct:
