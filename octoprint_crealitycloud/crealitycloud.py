@@ -341,7 +341,8 @@ class CrealityCloud(object):
             if self._aliprinter.stop == 0:
                 self._aliprinter.state = 3
                 self._aliprinter.error = ErrorCode.PRINT_DISCONNECT.value
-                self._aliprinter._printId = ""
+                self._aliprinter.printId = ""
+                self._aliprinter.printProgress = 0
                 self._logger.info("print failed")
         elif event == Events.DISCONNECTED:
             self._aliprinter.connect = 0
@@ -379,10 +380,14 @@ class CrealityCloud(object):
 
         elif event == Events.PRINT_CANCELLED:
             self.cancelled = True
-            self._aliprinter._upload_data({"err": 1, "stop": 1, "state": 4, "printId": self._aliprinter._printId})
+            self._aliprinter.error = 1
+            self._aliprinter.stop = 2
+            self._aliprinter.state = 4
+            self._aliprinter.printProgress = 0
+            self._aliprinter.printId = self._aliprinter._printId
             if not self._aliprinter.printId:
                 self._aliprinter.mcu_is_print = 0
-            self._aliprinter._printId = ""
+            self._aliprinter.printId = ""
             self.recorder.stop()
 
         elif event == Events.PRINT_DONE:
@@ -390,7 +395,8 @@ class CrealityCloud(object):
             self.recorder.stop()
             if not self._aliprinter.printId:
                 self._aliprinter.mcu_is_print = 0
-            self._aliprinter._printId = ""
+            self._aliprinter.mcu_is_print = 0
+            self._aliprinter.printId = ""
 			
         # get M114 payload
         elif event == Events.POSITION_UPDATE:
