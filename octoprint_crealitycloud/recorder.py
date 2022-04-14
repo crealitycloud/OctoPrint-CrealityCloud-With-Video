@@ -124,7 +124,9 @@ class Recorder(object):
         if self.get_platform(self) == "win_x64":
             self.ffmpeg = FFmpeg(
                 inputs={self.mjpg_stream_url: None},
-                outputs={path + '/%H-%M-%S.mp4': [
+                outputs={path + '/%H-%M-%S.mp4': ["-vf",
+                                            "drawtext=fontfile='C\:/Windows/fonts/Arial.ttf': text='%{pts\:localtime\:" + str(
+                                                time.time()) + "}': x=10: y=10: fontcolor=white: box=1: boxcolor=0x00000000@1",
                                             "-f", "segment", "-strftime", "1", "-segment_time", "60",
                                             "-reset_timestamps", "1",
                                             "-vcodec", "libx264"]}
@@ -132,7 +134,9 @@ class Recorder(object):
         else:
             self.ffmpeg = FFmpeg(
                 inputs={self.mjpg_stream_url: None},
-                outputs={path + '/%H-%M-%S.mp4': [
+                outputs={path + '/%H-%M-%S.mp4': ["-vf",
+                                            "drawtext=fontfile=Arial.ttf: text='%{pts\:localtime\:" + str(
+                                                time.time()) + "}': x=10: y=10: fontcolor=white: box=1: boxcolor=0x00000000@1",
                                             "-f", "segment", "-strftime", "1", "-segment_time", "60",
                                             "-reset_timestamps", "1",
                                             "-vcodec", "libx264"]}
@@ -209,7 +213,10 @@ class Recorder(object):
 
     def check_record_list(self):
         if os.access(self._recorder_list_path,os.F_OK):
-            return
+            if os.path.getsize(self._recorder_list_path) == 0:
+                self.create_record_list()
+            else:   
+                return
         else: 
             self.create_record_list()
 

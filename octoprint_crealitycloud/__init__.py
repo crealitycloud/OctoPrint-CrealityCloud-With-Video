@@ -34,19 +34,13 @@ class CrealitycloudPlugin(
         )
         self.short_code = None
         self._addr = None
-        self.klipper = auto_klipper()
+        self._regionId = None
+        self.printing_befor_connect = True
         self.recorder = Recorder()
 
     def initialize(self):
         self._crealitycloud = CrealityCloud(self, self.recorder)
         self._cxapi = CrealityAPI()
-        try:
-            self._addr = self._cxapi.getAddrress1()
-        except:
-            try:
-                self._addr = self._cxapi.getAddrress2()
-            except:
-                self._addr = ("", "US")
 
     def get_settings_defaults(self):
         return {
@@ -82,7 +76,7 @@ class CrealitycloudPlugin(
         # for details.
         return {
             "crealitycloud": {
-                "displayName": "Crealitycloud Plugin",
+                "displayName": "Crealitycloud-With-Video Plugin",
                 "displayVersion": self._plugin_version,
                 # version check: github repository
                 "type": "github_release",
@@ -101,21 +95,22 @@ class CrealitycloudPlugin(
 
     def get_assets(self):
         return dict(
-            js=["js/crealitycloud.js", "js/qrcode.min.js", "js/crealitycloudlive.js"], css=["css/crealitycloud.css"]
+            js=["js/crealitycloud.js", "js/crealitycloudlive.js"]
         )
 
     #get token
     @octoprint.plugin.BlueprintPlugin.route("/get_token", methods=["POST"])
+    @admin_permission.require(403)
     def get_token(self):
         try:
             self._res = self._cxapi.getconfig(request.json["token"])["result"]
-            region = self._res["regionId"]
-            self._config = {
+            self._config = {               
                 "deviceName": self._res["deviceName"],
-                "deviceSecret": self._res["deviceSecret"],
-                "productKey": self._res["productKey"],
-                "region": region
+                "deviceSecret": self._res["tbToken"],
+                "iotType": self._res["iotType"],
+				"region": self._res["regionId"]
                 }
+            self._regionId = self._res["regionId"]
             with io.open(
                 self.get_plugin_data_folder()+'/config.json', "w", encoding="utf-8"
             ) as config_file:
@@ -127,46 +122,22 @@ class CrealitycloudPlugin(
             return {"code": -1}
 
     @octoprint.plugin.BlueprintPlugin.route("/status", methods=["GET"])
+    @admin_permission.require(403)
     def get_status(self):
-        country = self._addr[1]
         if os.path.exists(self.get_plugin_data_folder() + "/config.json"):
+            if self._crealitycloud.get_server_region(self._regionId) is not None:
+                country = self._crealitycloud.get_server_region(self._regionId)
             if not self._crealitycloud.iot_connected:
                 self._logger.info("start iot server")
                 self._crealitycloud.device_start()
-                if self._crealitycloud.get_server_region() is not None:
-                    country = self._crealitycloud.get_server_region()
             return {
                 "actived": 1,
-                "iot": self._crealitycloud.iot_connected,
+                "iot": True,
                 "printer": self._printer.is_operational(),
                 "country": country,
             }
         else:
             return {"actived": 0, "iot": False, "printer": False, "country": country}
-
-    #klipper:
-    
-    #get model config
-    @octoprint.plugin.BlueprintPlugin.route("/setmodelid", methods=["POST"])
-    def test(self):
-        id = request.json["id"]
-        print(id)
-        self.klipper.set_id(id)
-        self.klipper.set_path()
-        self.klipper.change_serial()
-        self.klipper.set_status_json(1)
-        return {"code": "0"}
-    #post firmware name
-    @octoprint.plugin.BlueprintPlugin.route("/getfwname", methods=["GET"])
-    def getfwname(self):
-        fwname = self.klipper.get_fwname()
-        return {'fwname':fwname}
-    #post model.json
-    @octoprint.plugin.BlueprintPlugin.route("/getjson", methods=["GET"])
-    def getjson(self):
-        json = self.klipper.get_json()
-        print(json)
-        return(json)
 
     @octoprint.plugin.BlueprintPlugin.route("/recorderAction", methods=["GET"])
     def recorder_action(self):
@@ -255,7 +226,6 @@ class CrealitycloudPlugin(
             return {"code": 0, "list": list}
         except (FileNotFoundError, NotADirectoryError):
             return {"code": 0, "list": []}
-
     # get gcode return
     def gCodeHandlerSent(
         self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs
@@ -264,50 +234,52 @@ class CrealitycloudPlugin(
             self._crealitycloud._aliprinter._str_curFeedratePct = cmd
 
     def gCodeHandlerreceived(self, comm_instance, line, *args, **kwargs):
-        leftnum = 0
-        rightnum = 0
-        if not self._crealitycloud._iot_connected:
-            return line
-        if "SD printing byte " in line:
-            self._crealitycloud._aliprinter.mcu_is_print = 1
-            self._crealitycloud._aliprinter.state = 1
-            leftnum = ""
-            rightnum = ""
-            percentstr = line.lstrip("SD printing byte ")
-            for i in percentstr:
-                if i == "/":
-                    rightnum = str(percentstr.lstrip(leftnum)).rstrip("\r\n")
-                    rightnum = rightnum.lstrip("/")
-                    break
-                leftnum = leftnum + str(i)
-            self._crealitycloud._aliprinter.printProgress = (float(leftnum) / float(rightnum)) * 100
-            return line
-        elif "Current file: " in line:
-            self._crealitycloud._aliprinter.filename = line
-            return line
-        elif "Not SD printing" in line:
-            if (
-                    self._crealitycloud._aliprinter.mcu_is_print == 1
-                and not self._crealitycloud._aliprinter.printer.is_printing()
-            ):
+        if self.printing_befor_connect:
+            leftnum = 0
+            rightnum = 0
+            if not self._crealitycloud._iot_connected:
+                return line
+            if "SD printing byte " in line:
+                self._crealitycloud._aliprinter.mcu_is_print = 1
+                self._crealitycloud._aliprinter.state = 1
+                leftnum = ""
+                rightnum = ""
+                percentstr = line.lstrip("SD printing byte ")
+                try:
+                    leftnum = str(str(percentstr).split('/', 1)[0])
+                    rightnum = str(str(percentstr).split('/', 1)[1])
+                    self._crealitycloud._aliprinter.printProgress = (float(leftnum) / float(rightnum)) * 100
+                except Exception as e:
+                    self._logger.error(e)
                 
+                return line
+            elif "Current file: " in line:
+                self._crealitycloud._aliprinter.filename = line
+                return line
+            elif "Not SD printing" in line:
                 if (
-                    not self._crealitycloud._aliprinter.printId
-                    and leftnum != 0
-                    and rightnum != 0
-                    and ((float(leftnum) / float(rightnum)) * 100) > 99.9
+                        self._crealitycloud._aliprinter.mcu_is_print == 1
+                    and not self._crealitycloud._aliprinter.printer.is_printing()
                 ):
-                    self._crealitycloud._aliprinter.state = 2
-                    self._crealitycloud._aliprinter.printProgress = 0
-                else:
-                    self._crealitycloud._aliprinter.state = 0
-                    self._crealitycloud._aliprinter.printProgress = 0
-                self._crealitycloud._aliprinter.mcu_is_print == 0
-                
+                    
+                    if (
+                        not self._crealitycloud._aliprinter.printId
+                        and leftnum != 0
+                        and rightnum != 0
+                        and ((float(leftnum) / float(rightnum)) * 100) > 99.9
+                    ):
+                        self._crealitycloud._aliprinter.state = 2
+                        self._crealitycloud._aliprinter.printProgress = 0
+                    else:
+                        self._crealitycloud._aliprinter.state = 0
+                        self._crealitycloud._aliprinter.printProgress = 0
+                    self._crealitycloud._aliprinter.mcu_is_print == 0
+                self.printing_befor_connect = False
+            return line
         return line
 
 
-__plugin_name__ = "Crealitycloud Plugin"
+__plugin_name__ = "Crealitycloud-With-Video Plugin"
 
 __plugin_pythoncompat__ = ">=3,<4"
 

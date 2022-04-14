@@ -10,6 +10,7 @@ from contextlib import closing
 from enum import Enum
 
 import octoprint
+import octoprint.settings
 import octoprint.filemanager.analysis
 import octoprint.filemanager.storage
 import octoprint.plugin
@@ -22,7 +23,7 @@ from octoprint.filemanager.destinations import FileDestinations
 
 from octoprint_crealitycloud.filecontrol import filecontrol
 
-from .config import CreailtyConfig
+from .config import CrealityConfig
 
 
 class ErrorCode(Enum):
@@ -40,10 +41,10 @@ class ErrorCode(Enum):
 
 
 class CrealityPrinter(object):
-    def __init__(self, plugin, lk):
+    def __init__(self, plugin, lk, thingsboard):
 
         self._logger = logging.getLogger("octoprint.plugins.crealityprinter")
-        self._config = CreailtyConfig(plugin)
+        self._config = CrealityConfig(plugin)
         self._filecontrol = filecontrol(plugin)
         self.__linkkit = lk
         self.settings = plugin._settings
@@ -58,6 +59,7 @@ class CrealityPrinter(object):
         self._printProgress = -1
         self._mcu_is_print = -1
         self._printId = ''
+        self._print = ''
         self._nozzleTemp = -1
         self._nozzleTemp2 = -1
         self._bedTemp = -1
@@ -79,17 +81,36 @@ class CrealityPrinter(object):
         self._printStartTime = 0
         self._printTime = 0
         self.gcode_file = None
+        self.is_cloud_print = False
         self._logger.info("creality crealityprinter init!")
-
-    def __setitem__(self, k, v):
-        self._logger.info("__setitem__:" + k)
-        self.__dict__[k] = v
+        self.thingsboard = thingsboard
+        self._rpc_requestid = None
+        self._rpc_client = None
 
     def _upload_data(self, payload):
         if not payload:
             return
         try:
-            self.__linkkit.thing_post_property(payload)
+            self._logger.info(str(payload))
+            #self.__linkkit.thing_post_property(payload)
+        except Exception as e:
+            self._logger.error(str(e))
+
+    def _tb_send_telemetry(self, payload):
+        if not payload:
+            return
+        try:
+            self._logger.info('tb_send_telemetry:' + str(payload))
+            self.thingsboard.send_telemetry(payload)
+        except Exception as e:
+            self._logger.error(str(e))
+
+    def _tb_send_attributes(self, payload):
+        if not payload:
+            return
+        try:
+            self._logger.info('tb_send_attributes:' + str(payload))
+            self.thingsboard.send_attributes(payload)
         except Exception as e:
             self._logger.error(str(e))
 
@@ -100,7 +121,8 @@ class CrealityPrinter(object):
     @printId.setter
     def printId(self, v):
         self._printId = v
-        self._upload_data({"printId": self._printId})
+        #self._upload_data({"printId": self._printId})
+        self._tb_send_attributes({"printId": self._printId})
 
     @property
     def filename(self):
@@ -110,11 +132,14 @@ class CrealityPrinter(object):
     def filename(self,v):
         if 'no file' not in v:
             if v != self._filename:
-                self._filename = v  
-                filename = str(str(v).lstrip("Current file: ")).rsplit("\n")
-                filename = str(filename[0])
-                filename = filename.replace("GCO", "gcode")
-                self._upload_data({"print": str(filename)})
+                self._filename = v
+                try:
+                    filename = str(str(v).lstrip("Current file: ")).rsplit("\n")
+                    filename = str(filename[0])
+                    filename = filename.replace("GCO", "gcode")
+                    self._tb_send_attributes({"print": filename})
+                except Exception as e:
+                    self._logger.error(e)
 
     @property
     def print(self):
@@ -122,15 +147,19 @@ class CrealityPrinter(object):
 
     @print.setter
     def print(self, url):
+        self.is_cloud_print = True
         self._print = url
         self.layer = 0
-        printId = str(uuid.uuid1()).replace("-", "")
-        self.state = 0
-        self.dProgress = 0
-        self._download_thread = threading.Thread(
-            target=self._process_file_request, args=(url, printId)
-        )
-        self._download_thread.start()
+        try:
+            printId = str(uuid.uuid1()).replace("-", "")
+            self.dProgress = 0
+            self._download_thread = threading.Thread(
+                target=self._process_file_request, args=(url, printId)
+            )
+            self._download_thread.start()
+            self._tb_send_attributes({"print": self._print})
+        except Exception as e:
+            self._logger.error(e)
 
     @property
     def video(self):
@@ -139,7 +168,8 @@ class CrealityPrinter(object):
     @video.setter
     def video(self, v):
         self._video = v
-        self._upload_data({"video": v})
+        #self._upload_data({"video": v})
+        self._tb_send_attributes({"video": v})
 
     @property
     def ReqPrinterPara(self):
@@ -148,15 +178,21 @@ class CrealityPrinter(object):
     # get Position and Feedrate data
     @ReqPrinterPara.setter
     def ReqPrinterPara(self, v):
-        self._ReqPrinterPara = int(v)
-        if self._ReqPrinterPara == 0:
-            self._upload_data({"curFeedratePct": self._curFeedratePct})
-        # if self._ReqPrinterPara == 1:
+        request = int(v)
+        if request == 0:
+            #self._upload_data({"curFeedratePct": self._curFeedratePct})
+            self._tb_send_telemetry({"curFeedratePct": self._curFeedratePct})
+            self._ReqPrinterPara = {"curFeedratePct": self._curFeedratePct}
+        if request == 1:
             if self.printer.is_operational() and not self.printer.is_printing():
                 self._autohome = 1
                 self.printer.commands(["M114"])
-                self._upload_data({"curPosition": self._position,
+                #self._upload_data({"curPosition": self._position,
+                #                    "autohome": 1})
+                self._tb_send_attributes({"curPosition": self._position,
                                     "autohome": 1})
+                self._ReqPrinterPara = {"curPosition": self._position,
+                                    "autohome": 1}
             else:
                 self._autohome = 0
 
@@ -168,10 +204,14 @@ class CrealityPrinter(object):
     # upload filelist
     @reqGcodeFile.setter
     def reqGcodeFile(self, v):
-        page = int(v) & 0x0000FFFF
-        origin = int(v) >> 16
-        file_list = self._filecontrol.repfile(origin, page)
-        self._upload_data({"retGcodeFileInfo": file_list})
+        try:
+            page = int(v) & 0x0000FFFF
+            origin = int(v) >> 16
+            file_list = self._filecontrol.repfile(origin, page)
+            self._tb_send_attributes({"retGcodeFileInfo": file_list})
+            self._reqGcodeFile = {"retGcodeFileInfo": file_list}
+        except Exception as e:
+            self._logger.error(e)
 
     # upload curFeedratePct
     @property
@@ -183,19 +223,31 @@ class CrealityPrinter(object):
         if self._curFeedratePct != v:
             self._curFeedratePct = int(v)
             self.printer.feed_rate(self._curFeedratePct)
-            self._upload_data({"curFeedratePct": self._curFeedratePct})
+            #self._upload_data({"curFeedratePct": self._curFeedratePct})
+            self._tb_send_telemetry({"curFeedratePct": self._curFeedratePct})
 
     # get local ip address show in the CrealityCloud App
-    @property
     def ipAddress(self):
+        interface_address = None
+        Settings = octoprint.settings.Settings()
         try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
-            ip = s.getsockname()[0]
-        finally:
-            s.close()
-            self._upload_data({"netIP": ip})
-            return ip
+            enabled = Settings.getBoolean(["server", "onlineCheck", "enabled"])
+            if (enabled):
+                if (Settings.get(["server", "onlineCheck", "host"]) is not None):
+                    host = Settings.get(["server", "onlineCheck", "host"])
+                else:
+                    host = '8.8.8.8'
+                if (Settings.get(["server", "onlineCheck", "port"]) is not None):
+                    port = Settings.get(["server", "onlineCheck", "port"])
+                else:
+                    port = 53
+                interface_address = octoprint.util.address_for_client(host = host, port = port)
+            if interface_address is not None:
+                self._tb_send_attributes({"netIP": interface_address})
+                return interface_address
+        except Exception as e:
+            self._logger.error(e);
+            return None
 
     # sent gCode
     @property
@@ -207,6 +259,14 @@ class CrealityPrinter(object):
         self._gcodeCmd = v
         if v is not None:
             self.printer.commands([v])
+        self._tb_send_attributes({"gcodeCmd": self._gcodeCmd})
+        if self._gcodeCmd.find('G0') >= 0:
+            position = self._gcodeCmd.find('G0') + 2
+            self._tb_send_attributes({"setPosition": self._gcodeCmd[position:]})
+        elif self._gcodeCmd.find("G28 X Y") >= 0:
+            self._tb_send_attributes({"setPosition": "X0 Y0"})
+        elif self._gcodeCmd.find("G28 Z") >= 0:
+            self._tb_send_attributes({"setPosition": "Z0"})
 
     @property
     def state(self):
@@ -216,7 +276,8 @@ class CrealityPrinter(object):
     def state(self, v):
         if int(v) != int(self._state):
             self._state = v
-            self._upload_data({"state": self._state})
+            #self._upload_data({"state": self._state})
+            self._tb_send_attributes({"state": self._state})
 
     @property
     def dProgress(self):
@@ -225,7 +286,8 @@ class CrealityPrinter(object):
     @dProgress.setter
     def dProgress(self, v):
         self._dProgress = v
-        self._upload_data({"dProgress": self._dProgress})
+        #self._upload_data({"dProgress": self._dProgress})
+        self._tb_send_telemetry({"dProgress": self._dProgress})
 
     @property
     def connect(self):
@@ -238,13 +300,15 @@ class CrealityPrinter(object):
     @error.setter
     def error(self, v):
         self._error = v
-        self._upload_data({"err": self._error})
+        #self._upload_data({"err": self._error})
         self._logger.info("post error:" + str(self._error))
+        self._tb_send_attributes({"err": self._error})
 
     @connect.setter
     def connect(self, v):
         self._connected = v
-        self._upload_data({"connect": self._connected})
+        #self._upload_data({"connect": self._connected})
+        self._tb_send_attributes({"connect": self._connected})
 
     @property
     def pause(self):
@@ -253,7 +317,7 @@ class CrealityPrinter(object):
     @pause.setter
     def pause(self, v):
         self._pause = int(v)
-        self._upload_data({"pause": self._pause})
+        #self._upload_data({"pause": self._pause})
         if self._pause == 0:
             if self.printer.is_paused():
                 self.printer.resume_print()
@@ -262,6 +326,7 @@ class CrealityPrinter(object):
             if not self.printer.is_paused():
                 self.printer.pause_print()
                 self.state = 5
+        self._tb_send_attributes({"pause": self._pause})
 
     @property
     def tfCard(self):
@@ -270,7 +335,8 @@ class CrealityPrinter(object):
     @tfCard.setter
     def tfCard(self, v):
         self._tfCard = v
-        self._upload_data({"tfCard": self._tfCard})
+        #self._upload_data({"tfCard": self._tfCard})
+        self._tb_send_attributes({"tfCard": self._tfCard})
 
     @property
     def model(self):
@@ -279,7 +345,8 @@ class CrealityPrinter(object):
     @model.setter
     def model(self, v):
         self._model = v
-        self._upload_data({"model": self._model})
+        #self._upload_data({"model": self._model})
+        self._tb_send_attributes({"model": self._model})
 
     @property
     def stop(self):
@@ -293,7 +360,7 @@ class CrealityPrinter(object):
             self.printer.cancel_print()
         if self._stop == 2:
             self.state = 4
-        self._upload_data({'stop' : 1})
+        self._tb_send_attributes({'stop' : 1})
 
     @property
     def nozzleTemp(self):
@@ -303,7 +370,8 @@ class CrealityPrinter(object):
     def nozzleTemp(self, v):
         if int(v) != int(self.nozzleTemp):
             self._nozzleTemp = int(v)
-            self._upload_data({"nozzleTemp": int(self._nozzleTemp)})
+            #self._upload_data({"nozzleTemp": int(self._nozzleTemp)})
+            self._tb_send_telemetry({"nozzleTemp": int(self._nozzleTemp)})
 
     @property
     def nozzleTemp2(self):
@@ -313,8 +381,9 @@ class CrealityPrinter(object):
     def nozzleTemp2(self, v):
         if int(v) != int(self._nozzleTemp2):
             self._nozzleTemp2 = int(v)
-            self._upload_data({"nozzleTemp2": int(self._nozzleTemp2)})
+            #self._upload_data({"nozzleTemp2": int(self._nozzleTemp2)})
             self.printer.set_temperature("tool0", int(v))
+            self._tb_send_attributes({"nozzleTemp2": int(self._nozzleTemp2)})
 
     @property
     def bedTemp(self):
@@ -324,7 +393,8 @@ class CrealityPrinter(object):
     def bedTemp(self, v):
         if int(v) != int(self._bedTemp):
             self._bedTemp = int(v)
-            self._upload_data({"bedTemp": int(self._bedTemp)})
+            #self._upload_data({"bedTemp": int(self._bedTemp)})
+            self._tb_send_telemetry({"bedTemp": int(self._bedTemp)})
 
     @property
     def bedTemp2(self):
@@ -334,8 +404,9 @@ class CrealityPrinter(object):
     def bedTemp2(self, v):
         if int(v) != int(self._bedTemp2):
             self._bedTemp2 = int(v)
-            self._upload_data({"bedTemp2": self._bedTemp2})
+            #self._upload_data({"bedTemp2": self._bedTemp2})
             self.printer.set_temperature("bed", int(v))
+            self._tb_send_attributes({"bedTemp2": self._bedTemp2})
 
     @property
     def mcu_is_print(self):
@@ -345,7 +416,8 @@ class CrealityPrinter(object):
     def mcu_is_print(self, v):
         if int(v) != self._mcu_is_print:
             self._mcu_is_print = int(v)
-            self._upload_data({"mcu_is_print": self._mcu_is_print})
+            #self._upload_data({"mcu_is_print": self._mcu_is_print})
+            self._tb_send_attributes({"mcu_is_print": self._mcu_is_print})
 
     @property
     def boxVersion(self):
@@ -353,7 +425,8 @@ class CrealityPrinter(object):
 
     @boxVersion.setter
     def boxVersion(self, v):
-        self._upload_data({"boxVersion": self._boxVersion})
+        #self._upload_data({"boxVersion": self._boxVersion})
+        self._tb_send_attributes({"boxVersion": self._boxVersion})
 
     @property
     def printProgress(self):
@@ -363,7 +436,7 @@ class CrealityPrinter(object):
     def printProgress(self, v):
         if v != self._printProgress:
             self._printProgress = v
-            self._upload_data({"printProgress": int(self._printProgress)})
+            self._tb_send_telemetry({"printProgress": int(self._printProgress)})
 
     @property
     def layer(self):
@@ -372,7 +445,8 @@ class CrealityPrinter(object):
     @layer.setter
     def layer(self, v):
         self._layer = v
-        self._upload_data({"layer": self._layer})
+        #self._upload_data({"layer": self._layer})
+        self._tb_send_attributes({"layer": self._layer})
 
     @property
     def InitString(self):
@@ -382,7 +456,8 @@ class CrealityPrinter(object):
     def InitString(self, v):
         self._initString = v
         self._config.save_p2p_config("InitString", v)
-        self._upload_data({"InitString": self._initString})
+        #self._upload_data({"InitString": self._initString})
+        self._tb_send_attributes({"InitString": self._initString})
 
     @property
     def APILicense(self):
@@ -392,7 +467,8 @@ class CrealityPrinter(object):
     def APILicense(self, v):
         self._APILicense = v
         self._config.save_p2p_config("APILicense", v)
-        self._upload_data({"APILicense": self._APILicense})
+        #self._upload_data({"APILicense": self._APILicense})
+        self._tb_send_attributes({"APILicense": self._APILicense})
 
     @property
     def DIDString(self):
@@ -402,7 +478,8 @@ class CrealityPrinter(object):
     def DIDString(self, v):
         self._DIDString = v
         self._config.save_p2p_config("DIDString", v)
-        self._upload_data({"DIDString": self._DIDString})
+        #self._upload_data({"DIDString": self._DIDString})
+        self._tb_send_attributes({"DIDString": self._DIDString})
         eventManager().fire("CrealityCloud-Video", {})
 
     @property
@@ -416,7 +493,8 @@ class CrealityPrinter(object):
             self.printer.commands(["M106"])
         else:
             self.printer.commands(["M107"])
-        self._upload_data({"fan": self._fan})
+        #self._upload_data({"fan": self._fan})
+        self._tb_send_attributes({"fan": self._fan})
 
     @property
     def autohome(self):
@@ -434,6 +512,7 @@ class CrealityPrinter(object):
             if "z" in self._autohome:
                 axes.append("z")
             self.printer.home(axes)
+        self._tb_send_attributes({"autohome": self._autohome})
 
     @property
     def printStartTime(self):
@@ -442,7 +521,25 @@ class CrealityPrinter(object):
     @printStartTime.setter
     def printStartTime(self, v):
         self._printStartTime = v
-        self._upload_data({"printStartTime": str(self._printStartTime)})
+        #self._upload_data({"printStartTime": str(self._printStartTime)})
+        self._tb_send_attributes({"printStartTime": str(self._printStartTime)})
+
+    @property
+    def rpc_requestid(self):
+        return self._rpc_requestid
+
+    @rpc_requestid.setter
+    def rpc_requestid(self, v):
+        self._rpc_requestid = v
+
+    @property
+    def rpc_client(self):
+        return self._rpc_client
+
+    @rpc_client.setter
+    def rpc_client(self, v):
+        self._rpc_client = v
+    
 
     def _process_file_request(self, download_url, new_filename):
         from octoprint.filemanager.destinations import FileDestinations
@@ -462,8 +559,12 @@ class CrealityPrinter(object):
         temp_path = os.path.join(
             temp_dir, "crealitycloud-file-upload-{}".format(new_filename)
         )
-
-        self.download_filename = os.path.splitext(new_filename)[0]
+        self._logger.info("new_filename:" + new_filename)
+        if download_url.find("gcode.gz") >= 0:
+            self.download_filename = os.path.splitext(new_filename)[0]
+        else:
+            self.download_filename = new_filename
+        self._logger.info("download_filename:" + self.download_filename)
         self.gcode_file = os.path.join(temp_dir, self.download_filename)
 
         filenameToSelect = self.Filemanager.path_on_disk(FileDestinations.LOCAL, self.download_filename)
@@ -472,10 +573,14 @@ class CrealityPrinter(object):
             if os.path.exists(temp_path) == False:
 
                 self.download(download_url, temp_path)
-                gfile = gzip.GzipFile(temp_path)
-                open(self.gcode_file, "wb+").write(gfile.read())
-                gfile.close()
-                os.remove(temp_path)
+                if temp_path.find("gcode.gz") >= 0:
+                    gfile = gzip.GzipFile(temp_path)
+                    open(self.gcode_file, "wb+").write(gfile.read())
+                    gfile.close()
+                    os.remove(temp_path)
+                else:
+                    os.rename(temp_path,self.gcode_file)
+
             self._logger.info("Copying file to filemanager:" + self.gcode_file)
             upload = DiskFileWrapper(self.download_filename, self.gcode_file)
             self._logger.info(type(upload))
@@ -537,15 +642,16 @@ class CrealityPrinter(object):
         )
 
         # Fire file uploaded event
-        payload = {
-            "name": future_filename,
-            "path": added_file,
-            "target": FileDestinations.LOCAL,
-            "select": True,
-            "print": True,
-            "app": True,
-        }
-        eventManager().fire(Events.UPLOAD, payload)
+        if fileExists is not True:
+            payload = {
+                "name": future_filename,
+                "path": added_file,
+                "target": FileDestinations.LOCAL,
+                "select": True,
+                "print": True,
+                "app": True,
+            }
+            eventManager().fire(Events.UPLOAD, payload)
         self._logger.debug("Finished uploading the file")
 
         # Remove temporary file (we didn't forget about you!)
@@ -560,6 +666,7 @@ class CrealityPrinter(object):
         # We got to the end \o/
         # Likely means everything went OK
         return True
+
 
     def download(self, url, file_path):
         headers = {
@@ -602,6 +709,7 @@ class CrealityPrinter(object):
                 )
         else:
             self._filecontrol.controlfiles(v)
+        self._tb_send_attributes({"opGcodeFile": v})
 
     @property
     def printJobTime(self):
@@ -613,7 +721,8 @@ class CrealityPrinter(object):
             return
         else:
             self._printJobTime = int(v)
-            self._upload_data({"printJobTime": self._printJobTime})
+            #self._upload_data({"printJobTime": self._printJobTime})
+            self._tb_send_telemetry({"printJobTime": self._printJobTime})
 
     @property
     def printLeftTime(self):
@@ -625,4 +734,5 @@ class CrealityPrinter(object):
             return
         else:
             self._printLeftTime = int(v)
-            self._upload_data({"printLeftTime": self._printLeftTime})
+            #self._upload_data({"printLeftTime": self._printLeftTime}) 
+            self._tb_send_telemetry({"printLeftTime": self._printLeftTime})

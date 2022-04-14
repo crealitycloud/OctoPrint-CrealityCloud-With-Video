@@ -1,67 +1,40 @@
+<br>
+<h2>CrealityCloud-Octoprint Plugin</h2>
+<hr>
 <div class="container_fluid" id="bindPage_success" data-bind="text: activedMsg, visible: isAcitived()">
 </div>
 
 <div data-bind="visible: !isAcitived()">
+  <h3>
+  Before you start configuring the Plugin,
+  </h3>
+  You need to read carefully and agree to the following content:
   <br>
-  <div>Please download the Creality Cloud APP to get the Key file.</div>
-  <br>
-  <div><a target="view_window" data-bind="attr:{href:appdownloadUrl}">Download the Creality Cloud app</a></div>
-  <br>
-  <div>Click the button below to upload the Key file.</div>
-  <br>
+  <ul>
+    <li>
+      <p>
+        The Creality Cloud plugin needs to enable cloud services, and your 3D printing data will be uploaded to the cloud server, such as temperature, printing speed, printing status, etc. 
+      More detailed information about the privacy policy can be viewed inside the Creality Cloud App navigating to My Space > About > Privacy Policy
+      </p> 
+    </li>
+    <li>
+      <p>
+        You need a Creality Cloud account to connect octoprint and Creality Cloud App.More detailed information about the privacy policy can be viewed inside the Creality Cloud App navigating to My Space > About > User Agreement
+      </p>
+    </li>
+  </ul>
+  <hr>
+  <h3>
+  Configuring the Plugin
+  </h3>
+  <ul>
+    <li><div>Please download the Creality Cloud App to get the Key file.</div></li>
+    <li><div><a target="view_window" data-bind="attr:{href:appdownloadUrl}">Download the Creality Cloud App</a></div></li>
+    <li><a href="https://github.com/crealitycloud/OctoPrint-CrealityCloud#readme" target="_Blank">How to get the Key file</a></li>
+    <li><div>Click the button below to upload the Key file.</div></li>
+  </ul>
   <span class="btn fileinput-button">
     <span>{{ _('Browse...') }}</span>
     <input id="token_file_input" type="file" class="settings_token_input" accept=".tk">
   </span>
-</div>
-
-<br>
-<br>
-<label><input id="using klipper" type="checkbox" data-bind="click: clickKlipper,checked:checkKlipper" />use
-  klipper</label>
-
-<style>
-  .warning{
-    color: #FF0000; 
-  }
-</style>
-
-<div id="klipper_header" data-bind="visible: Klipperable()">
-  <br>
-  <h4 class="warning">This is a test feature. Please make sure you can roll back the firmware.</h4>
-  <p>
-  <h3>Klipper Auto Configuration</h3>
-  </p>
-  <p>
-  <h5>Select Your Printer</h5>
-  </p>
-  <select id="model"
-    data-bind="options: selectData,optionsText: 'model', optionsValue:'id',value: selectmodelData, optionsCaption: 'Select...',event:{change:changemodel}">
-  </select>
-  <p> </p><button id="confirm" data-bind="enable:allowconfirm,click:clickconfirm">confirm</button>
-  <br>
-  <br>
-  <button id="downfw" data-bind="enable:allowdownfw,click:fwdown">
-    Download the Klipper firmware
-  </button>
-  <p>
-  <h3>Configuring OctoPrint to use Klipper</h3>
-  <p>
-  The OctoPrint web server needs to be configured to communicate with the Klipper host software. Using a web browser, configure the following items:
-  <br>
-  <br>
-  Navigate to the <b>Settings tab</b> (the wrench icon at the top of the page). Under <b>"Serial Connection"</b> in <b>"Additional serial ports"</b> add <b>"/tmp/printer"</b>. Then click <b>"Save"</b>.
-  <br>
-  <br>
-  Enter the Settings tab again and under <b>"Serial Connection"</b> change the <b>"Serial Port"</b> setting to <b>"/tmp/printer"</b>.
-  <br>
-  <br>
-  In the <b>Settings tab</b>, navigate to the <b>"Behavior"</b> sub-tab and select the <b>"Cancel any ongoing prints but stay connected to the printer"</b> option. Click <b>"Save"</b>.
-  <br>
-  <br>
-  From the main page, under the <b>"Connection"</b> section (at the top left of the page) make sure the <b>"Serial Port"</b> is set to <b>"/tmp/printer"</b> and click <b>"Connect"</b>. (If "/tmp/printer" is not an available selection then try reloading the page.)
-  <br>
-  <br>
-  Once connected, navigate to the "Terminal" tab and type "status" (without the quotes) into the command entry box and click "Send". The terminal window will likely report there is an error opening the config file - that means OctoPrint is successfully communicating with Klipper. Proceed to the next section.
-  </p>
 </div>
