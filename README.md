@@ -21,7 +21,7 @@ You need a Creality Cloud account to connect octoprint and Creality Cloud App.Mo
 Creality Cloud Plugin:
 
 
-- [https://github.com/crealitycloud/OctoPrint-Crealitycloud/archive/master.zip](https://github.com/crealitycloud/OctoPrint-Crealitycloud/archive/master.zip)
+- [https://github.com/crealitycloud/OctoPrint-CrealityCloud-With-Video/archive/master.zip](https://github.com/crealitycloud/OctoPrint-CrealityCloud-With-Video/archive/master.zip)
 
 
 
