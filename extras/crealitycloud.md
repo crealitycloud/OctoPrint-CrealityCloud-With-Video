@@ -2,7 +2,7 @@
 layout: plugin
 
 id: crealitycloud
-title: OctoPrint-Crealitycloud
+title: OctoPrint-Crealitycloud-With-Video
 description: TODO
 authors:
 - crealitycloud
@@ -11,9 +11,9 @@ license: AGPLv3
 # TODO
 date: 2022-04-14
 
-homepage: https://github.com/crealitycloud/OctoPrint-Crealitycloud
-source: https://github.com/crealitycloud/OctoPrint-Crealitycloud
-archive: https://github.com/crealitycloud/OctoPrint-Crealitycloud/archive/master.zip
+homepage: https://github.com/crealitycloud/OctoPrint-Crealitycloud-With-Video
+source: https://github.com/crealitycloud/OctoPrint-Crealitycloud-With-Video
+archive: https://github.com/crealitycloud/OctoPrint-Crealitycloud-With-Video/archive/master.zip
 
 # TODO
 # Set this to true if your plugin uses the dependency_links setup parameter to include
