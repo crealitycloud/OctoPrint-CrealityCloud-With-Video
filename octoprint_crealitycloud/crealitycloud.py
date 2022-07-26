@@ -144,7 +144,7 @@ class CrealityCloud(object):
                         try:
                             path = self._aliprinter.plugin._file_manager.path_on_disk(self.print_origin,self.print_path)
                             with io.open(path, mode="r", encoding="utf8", errors="replace") as file:
-                                for line in file.readlines():
+                                for line in file:
                                     if line[0] != ';':
                                         break
                                     else:
@@ -459,9 +459,11 @@ class CrealityCloud(object):
                 path = self._aliprinter.plugin._file_manager.path_on_disk(self.print_origin,self.print_path)
                 with io.open(path, mode="r", encoding="utf8", errors="replace") as file:
                     self._logger.info("read gcode##################")
-                    for line in file.readlines():
+                    for line in file:
                         #self._logger.info("################" + str(line))
-                        if line == ';----------Shell Config----------------':
+                        if ';----------Shell Config----------------' in line:
+                            break
+                        elif 'G28 ;Home' in line:
                             break
                         else:
                             if "Print Temperature" in line:
@@ -470,6 +472,12 @@ class CrealityCloud(object):
                             elif "Bed Temperature" in line:
                                 self._logger.info("#################" +str(line))
                                 bedTemp2 = int(line.replace(";Bed Temperature:", ""))
+                            elif "M140" in line:
+                                self._logger.info("#################" + str(line))
+                                nozzleTemp2 = int(line.replace("M140 S", ""))
+                            elif "M104" in line:
+                                self._logger.info("#################" +str(line))
+                                bedTemp2 = int(line.replace("M104 S", ""))                                
             except:
                 self._logger.info("file not exist")    
             if nozzleTemp2 is not None:

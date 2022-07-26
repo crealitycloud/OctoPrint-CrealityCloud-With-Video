@@ -80,7 +80,7 @@ class CrealityPrinter(object):
         self._printLeftTime = 0
         self._printStartTime = 0
         self._printTime = 0
-        self.gcode_file = None
+        self.gcode_file = ""
         self.is_cloud_print = False
         self._logger.info("creality crealityprinter init!")
         self.thingsboard = thingsboard
