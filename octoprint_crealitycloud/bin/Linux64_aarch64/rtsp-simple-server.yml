@@ -137,6 +137,9 @@ hlsAllowOrigin: '*'
 # The settings under the path "all" are applied to all paths that do not match
 # another entry.
 paths:
+  ch0_0:
+    runOnInit: /usr/bin/ffmpeg -f mjpeg -r 10 -i http://127.0.0.1/webcam/?action=stream -loglevel quiet -tune zerolatency -vcodec h264_omx -preset veryfast -f rtsp rtsp://127.0.0.1:8554/ch0_0
+    # runOnInitRestart: yes
   all:
     # Source of the stream. This can be:
     # * publisher -> the stream is published by a RTSP or RTMP client

@@ -6,6 +6,10 @@ import threading
 import time
 import calendar;
 import time;
+import asyncio
+import queue
+from .signaling_channel import WebSocketClient
+from .webrtc_manager import WebrtcManager
 
 from octoprint.events import Events
 from octoprint.util import RepeatedTimer
@@ -64,7 +68,9 @@ class CrealityCloud(object):
         self.model = ''
         self._printer_disconnect = False
         self._M27_timer_state = False
-
+        self.thingsboard_Id = None
+        self.WebrtcManager = None
+        self.WebSocketClient = None
 
         self._upload_timer = RepeatedTimer(2,self._upload_timing,run_first=True)
         self._send_M27_timer = RepeatedTimer(10,self._send_M27_timing,run_first=False)
@@ -193,12 +199,12 @@ class CrealityCloud(object):
             else:               
                 thingsboard_Token = self.config_data["deviceSecret"]
 
-            thingsboard_Id = self.config_data["deviceName"]
-            self.thingsboard = ThingsBoard(thingsboard_Id,thingsboard_Token)
+            self.thingsboard_Id = self.config_data["deviceName"]
+            self.thingsboard = ThingsBoard(self.thingsboard_Id,thingsboard_Token)
             self._iot_connected = self.thingsboard.connect_state
             self.thingsboard.on_server_side_rpc_request = self.on_server_side_rpc_request
             self.thingsboard.client_initialization(region)
-            self._aliprinter = CrealityPrinter(self.plugin, self.lk, self.thingsboard)
+            self._aliprinter = CrealityPrinter(self.plugin, self.lk, self.thingsboard, self.thingsboard_Id, region)
             self._progress = ProgressMonitor()
             self._aliprinter.printer.register_callback(self._progress)
             self._aliprinter.ipAddress()
@@ -325,12 +331,21 @@ class CrealityCloud(object):
                 self._logger.info(
                     "on_thing_prop_changed params:" + prop_name + ":" + str(prop_value)
                 )
-                try:
-                    exec("self._aliprinter." + prop_name + "='" + str(prop_value) + "'")
-                    exec("getReturn.update(self._aliprinter." + prop_name + ")")
-                except Exception as e:
-                    self._logger.error(e)
-                    getReturn = {"code":1}
+                if prop_name.find('getRecordList') >= 0:
+                    if prop_value == 1:
+                        #record_list = self.recorder.read_record_list()
+                        #getReturn = {"code":0,"msg":"success"}
+                        #getReturn['result'] = record_list
+                        getReturn = self.recorder.read_record_list()
+                    else:
+                        getReturn = {"code":1}
+                else:
+                    try:
+                        exec("self._aliprinter." + prop_name + "='" + str(prop_value) + "'")
+                        exec("getReturn.update(self._aliprinter." + prop_name + ")")
+                    except Exception as e:
+                        self._logger.error(e)
+                        getReturn = {"code":1}
             self.tb_reply_rpc(client, request_id, getReturn)
 
     def on_publish_topic(self, mid, userdata):
@@ -340,23 +355,34 @@ class CrealityCloud(object):
         self._logger.info("plugin started")
 
     def video_start(self):
-        initString = self._config.p2p_data().get("InitString")
-        didString = self._config.p2p_data().get("DIDString")
-        apiLicense = self._config.p2p_data().get("APILicense")
-        prop_data = {
-            "InitString": initString if initString is not None else "",
-            "DIDString": didString if didString is not None else "",
-            "APILicense": apiLicense if apiLicense is not None else "",
-        }
+        # initString = self._config.p2p_data().get("InitString")
+        # didString = self._config.p2p_data().get("DIDString")
+        # apiLicense = self._config.p2p_data().get("APILicense")
+        # prop_data = {
+        #     "InitString": initString if initString is not None else "",
+        #     "DIDString": didString if didString is not None else "",
+        #     "APILicense": apiLicense if apiLicense is not None else "",
+        # }
 
-        #self.lk.thing_post_property(prop_data)
-        self.thingsboard.send_attributes({"prop_data": str(prop_data)})
-        if initString is None:
+        # #self.lk.thing_post_property(prop_data)
+        # self.thingsboard.send_attributes({"prop_data": str(prop_data)})
+        # if initString is None:
+        #     return
+        # self.start_video_service()
+        # time.sleep(2)  # wait video process started
+        # self.start_p2p_service()
+        # self._logger.info("video service started")
+        #self.webrtc_start()
+        if self._video_service_thread is not None:
             return
-        self.start_video_service()
-        time.sleep(2)  # wait video process started
-        self.start_p2p_service()
-        self._logger.info("video service started")
+        video_service_path = (
+            os.path.dirname(os.path.abspath(__file__)) + "/bin/rtsp_server.sh"
+        )
+        env = os.environ.copy()
+        self._video_service_thread = threading.Thread(
+            target=self._runcmd, args=(["/bin/bash", video_service_path], env)
+        )
+        self._video_service_thread.start()
 
     def device_start(self):
         if self.thingsboard is None:

@@ -6,6 +6,10 @@ import tempfile
 import threading
 import time
 import uuid
+import asyncio
+import queue
+from .signaling_channel import WebSocketClient
+from .webrtc_manager import WebrtcManager
 from contextlib import closing
 from enum import Enum
 
@@ -20,7 +24,7 @@ import psutil
 import requests
 from octoprint.events import Events, eventManager
 from octoprint.filemanager.destinations import FileDestinations
-
+from octoprint.util import RepeatedTimer
 from octoprint_crealitycloud.filecontrol import filecontrol
 
 from .config import CrealityConfig
@@ -41,7 +45,7 @@ class ErrorCode(Enum):
 
 
 class CrealityPrinter(object):
-    def __init__(self, plugin, lk, thingsboard):
+    def __init__(self, plugin, lk, thingsboard, tbid, region):
 
         self._logger = logging.getLogger("octoprint.plugins.crealityprinter")
         self._config = CrealityConfig(plugin)
@@ -51,7 +55,7 @@ class CrealityPrinter(object):
         self.printer = plugin._printer
         self.plugin = plugin
         self.Filemanager = self._filecontrol.Filemanager
-        self._boxVersion = "rasp_v2.01b99"
+        self._boxVersion = "rasp_v2.11b00"
         self._state = -1
         self._stop = 0
         self._pause = 0
@@ -80,13 +84,23 @@ class CrealityPrinter(object):
         self._printLeftTime = 0
         self._printStartTime = 0
         self._printTime = 0
-        self.gcode_file = ""
+        self.gcode_file = None
         self.is_cloud_print = False
         self._logger.info("creality crealityprinter init!")
         self.thingsboard = thingsboard
         self._rpc_requestid = None
         self._rpc_client = None
-
+        self._jwttoken = None
+        self._livestream = None
+        self._pullclient = None   
+        self._webrtc_thread = None  
+        self._thingsboard_Id =    tbid 
+        self.websocket_queue = queue.Queue()
+        self.close_queue = queue.Queue()
+        self.WebSocketClient = None
+        self.WebrtcManager = None
+        self.region = region
+        
     def _upload_data(self, payload):
         if not payload:
             return
@@ -736,3 +750,123 @@ class CrealityPrinter(object):
             self._printLeftTime = int(v)
             #self._upload_data({"printLeftTime": self._printLeftTime}) 
             self._tb_send_telemetry({"printLeftTime": self._printLeftTime})
+
+    # @property
+    # def print(self):
+    #     return self._print
+
+    # @print.setter
+    # def print(self, url):
+    #     self.is_cloud_print = True
+    #     self._print = url
+    #     self.layer = 0
+    #     try:
+    #         printId = str(uuid.uuid1()).replace("-", "")
+    #         self.dProgress = 0
+    #         self._download_thread = threading.Thread(
+    #             target=self._process_file_request, args=(url, printId)
+    #         )
+    #         self._download_thread.start()
+    #         self._tb_send_attributes({"print": self._print})
+    #     except Exception as e:
+    #         self._logger.error(e)
+    @property
+    def token(self):
+        return self._jwttoken
+
+    @token.setter
+    def token(self, v):
+        # if self._jwttoken == str(v):
+        #     return
+        # else:
+        self._jwttoken = str(v)
+        if self.WebSocketClient is not None:
+            self.WebSocketClient.token_update(self._jwttoken)
+        if self.WebrtcManager is not None:
+            self.WebrtcManager.token_update(self._jwttoken)
+        self._tb_send_attributes({"token": self._jwttoken})
+
+        if self._webrtc_thread is None:
+            try:
+                self._webrtc_thread = threading.Thread(target=self.start_webrtc_service)
+                self._webrtc_thread.start()                   
+            except Exception as e:
+                self._logger.error(e)                    
+        elif self._webrtc_thread is not None:
+            if self._webrtc_thread.is_alive() == False:
+                try:
+                    self._webrtc_thread = threading.Thread(target=self.start_webrtc_service)
+                    self._webrtc_thread.start()                   
+                except Exception as e:
+                    self._logger.error(e)             
+
+    @property
+    def pullclient(self):
+        return self._pullclient
+
+    @pullclient.setter
+    def pullclient(self, v):
+        if self._pullclient == str(v):
+            return
+        else:
+            self._pullclient = str(v)
+            self._tb_send_attributes({"pullclient": self._pullclient})
+
+    @property
+    def livestream(self):
+        return self._livestream
+
+    @livestream.setter
+    def livestream(self, v):
+        if self._livestream == int(v):
+            return
+        else:
+            self._livestream = int(v)
+            self._tb_send_attributes({"livestream": self._livestream})
+            if self._livestream == 0:
+                self.close_queue.put(self._pullclient)
+
+    async def websocket_msg_run(self, webrtcmanager, websocketclient):
+        while True:
+            await asyncio.sleep(0.1)
+            if not self.websocket_queue.empty():
+                message = self.websocket_queue.get()
+                await webrtcmanager.signaling_message_handler(websocketclient, message)
+            if not self.close_queue.empty():
+                peerId = self.close_queue.get()
+                self._logger.info("close_queue:" + str(peerId))
+                if peerId == "all":
+                    self._logger.info("close all")
+                    break  
+                await webrtcmanager.remove_peer(peerId)
+        self.WebSocketClient.close()
+        self._pc_update_timer.cancel()
+        self._pc_update_timer = None
+        
+    def start_webrtc_service(self):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        if self.region == 0:       
+            URL = "wss://api.crealitycloud.cn/api/cxy/ws/webrtc/signal/push/"
+        else:
+            URL = "wss://api.crealitycloud.com/api/cxy/ws/webrtc/signal/push/"
+        webrtcOptions = {"enableDataChannel": False,
+                "enableLocalStream": True,
+                "enableRemoteStream": False,
+                "cameraDevice": "rtsp://127.0.0.1:8554/ch0_0"}
+        # websocket_queue = queue.Queue()
+        # close_queue = queue.Queue()
+        self.WebrtcManager = WebrtcManager(self._thingsboard_Id, self._thingsboard_Id, webrtcOptions, self.close_queue, self._jwttoken, self.region, verbose=True)
+        self.WebSocketClient = WebSocketClient(URL + self._thingsboard_Id, self.websocket_queue, self._jwttoken)
+        self._pc_update_timer = RepeatedTimer(30,self.peerconnection_upadate,run_first=False)
+        self._pc_update_timer.start()
+        try:
+             loop.run_until_complete(
+                self.websocket_msg_run(self.WebrtcManager, self.WebSocketClient)
+            )
+        except KeyboardInterrupt:
+            pass
+
+    def peerconnection_upadate(self):
+        if self.WebrtcManager is not None and self.WebSocketClient is not None:
+            self.WebrtcManager.push_state(self.WebSocketClient)

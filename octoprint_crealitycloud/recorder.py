@@ -129,17 +129,18 @@ class Recorder(object):
                                                 time.time()) + "}': x=10: y=10: fontcolor=white: box=1: boxcolor=0x00000000@1",
                                             "-f", "segment", "-strftime", "1", "-segment_time", "60",
                                             "-reset_timestamps", "1",
-                                            "-vcodec", "libx264"]}
+                                            "-vcodec", "h264_omx"]}
             )
         else:
             self.ffmpeg = FFmpeg(
                 inputs={self.mjpg_stream_url: None},
-                outputs={path + '/%H-%M-%S.mp4': ["-vf",
-                                            "drawtext=fontfile=Arial.ttf: text='%{pts\:localtime\:" + str(
-                                                time.time()) + "}': x=10: y=10: fontcolor=white: box=1: boxcolor=0x00000000@1",
+                outputs={path + '/%H-%M-%S.mp4': [
+                                            #"-vf",
+                                            #"drawtext=fontfile=Arial.ttf: text='%{pts\:localtime\:" + str(
+                                            #    time.time()) + "}': x=10: y=10: fontcolor=white: box=1: boxcolor=0x00000000@1",
                                             "-f", "segment", "-strftime", "1", "-segment_time", "60",
                                             "-reset_timestamps", "1",
-                                            "-vcodec", "libx264"]}
+                                            "-vcodec", "h264_omx"]}
             )
         try:
             self.ffmpeg.run()
@@ -192,17 +193,19 @@ class Recorder(object):
             self._logger.error(e)
         self.timer = None
         self.stop_recorder()
+        threading.Thread(target=self.concat_video).start()
         if self.ffmpeg == None and self.timer == None:
             return True
         else:
             return False
 
     def play(self,path):
-        if self.path_play != path:
-            self.stop_play()
-            self.path_play = path
-            t = threading.Thread(target=self.start_play(path))
-            t.start()
+        return
+        # if self.path_play != path:
+        #     self.stop_play()
+        #     self.path_play = path
+        #     t = threading.Thread(target=self.start_play(path))
+        #     t.start()
 
     def create_record_list(self):
         jsontext = {"cmd":"getRecordList","sn":"1","format":"mp4","playbacks":[]}
@@ -220,6 +223,15 @@ class Recorder(object):
         else: 
             self.create_record_list()
 
+    def read_record_list(self):
+        if os.access(self._recorder_list_path,os.F_OK):
+            with open(self._recorder_list_path,'r',encoding='utf-8') as load_f:        
+                #content = load_f.read()
+                content = json.load(load_f)
+                return content
+        else:
+            return ""
+            
     def add_record_time(self):
         self.check_record_list()
         date = time.strftime("%Y-%m-%d", time.localtime())
@@ -295,7 +307,7 @@ class Recorder(object):
             self.ffmpeg_play = FFmpeg(
                     #inputs={'rtsp://172.23.215.16:8086': None},
                     inputs={'http://127.0.0.1/webcam/?action=stream': ['-f', 'mjpeg', '-r', '10']},
-                    outputs={outpath: ['-q', '0', '-loglevel', 'quiet', '-b:v', '8000K', '-tune', 'zerolatency', '-vcodec', 'h264_omx', '-preset', 'veryfast', '-f', 'rtsp']}
+                    outputs={outpath: ['-q', '0', '-loglevel', 'quiet', '-tune', 'zerolatency', '-vcodec', 'h264_omx', '-preset', 'veryfast', '-f', 'rtsp']}
                 )
         else:
             listpath = self.create_play_list(path)
@@ -304,7 +316,7 @@ class Recorder(object):
             #ffmpeg  -f concat -i filelist.txt -s 800*480 -b:v 8000K  -tune zerolatency -vcodec h264_omx -preset veryfast -f rtsp rtsp://127.0.0.1:8554/ch0_0
             self.ffmpeg_play = FFmpeg(
                     inputs={listpath: ['-f', 'concat']},
-                    outputs={outpath: ['-s', '800*480', '-b:v', '8000K', '-tune', 'zerolatency', '-vcodec', 'h264_omx', '-preset', 'veryfast', '-f', 'rtsp']}
+                    outputs={outpath: ['-s', '800*480', '-tune', 'zerolatency', '-vcodec', 'h264_omx', '-preset', 'veryfast', '-f', 'rtsp']}
                 )
         try:
             self.ffmpeg_play.run()
@@ -370,3 +382,59 @@ class Recorder(object):
                 i = i + 1
         fo.close()
         return listpath
+
+    def concat_video(self):
+        self._logger.info('start concat video')
+        filepath = self.get_new_recorder_hour_dir()
+        listpath = filepath + "/" + "playlist.txt"
+        outputpath = filepath + "/" + "output.mp4"
+        # 返回path下所有文件构成的一个list列表
+        if os.access(listpath,os.F_OK):    
+            os.remove(listpath)     
+        filelist=os.listdir(filepath)
+        filelist.sort()
+        fo = open(listpath, "w")
+        for item in filelist:
+            content = "file" + " '" + item + "'\n"          
+            fo.write(content)
+        fo.close()
+        #return listpath
+        ffmpeg_concat = FFmpeg(inputs={listpath: ['-f', 'concat']},
+                                outputs={outputpath: ['-c', 'copy']})
+        try:
+            ffmpeg_concat.run()
+        except FFRuntimeError as ex:
+            if ex.exit_code and ex.exit_code != 1:
+                self._logger.error(ex)
+
+    def find_video(self, path):
+        path = path.replace('rec-tick-', '', 1)
+        path = path.replace('.h264', '', 1)
+        path = time.gmtime(int(path) + 28800)
+        datepath = time.strftime("%Y-%m-%d", path)
+        path = time.strftime("%Y-%m-%d__%H-%M-%S", path)
+        printidpath = ""
+        #通过时间戳在vlist.json里找到printid
+        if os.access(self._recorder_list_path,os.F_OK):
+            with open(self._recorder_list_path,'r',encoding='utf-8') as load_f:
+                load_dict = json.load(load_f)                                   
+                load_list = load_dict['playbacks']                           
+                for i, date_dict in enumerate(load_list):                
+                    for i in date_dict:                              
+                        printid_list = date_dict[i]                             
+                        for i, print_dict in enumerate(printid_list):        
+                            for i in print_dict:      
+                                #ttttt =  print_dict['start']    
+                                tsp = int(time.mktime(time.strptime(path, '%Y-%m-%d__%H-%M-%S')))
+                                tss = int(time.mktime(time.strptime(print_dict['start'], '%Y-%m-%d__%H-%M-%S')))
+                                tse = int(time.mktime(time.strptime(print_dict['end'], '%Y-%m-%d__%H-%M-%S')))              
+                                if tss == tsp:            
+                                    printidpath = print_dict['printId']
+                                    #tsx = 0
+                                    #self.flag = 0
+                                elif tss < tsp and tse > tsp:
+                                    printidpath = print_dict['printId']
+                                    #tsx = (tsp -tss)/10
+                                    #self.flag = 1
+        filepath = self._recorder_file_path + "/" + datepath + "/" + printidpath +"/output.mp4"
+        return filepath
