@@ -13,6 +13,11 @@ You need a Creality Cloud account to connect octoprint and Creality Cloud App.Mo
 
 ## **Setup Creality Cloud Plugin on OctoPrint:**
 
+need to run before installation:
+
+.. code:: bash
+
+    apt install libsrtp2-dev
 
 1. Copy the following three plugin links or copy them from Creality Cloud Github.
 
