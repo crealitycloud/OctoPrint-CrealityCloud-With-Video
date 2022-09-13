@@ -71,13 +71,12 @@ class CrealityCloud(object):
         self.thingsboard_Id = None
         self.WebrtcManager = None
         self.WebSocketClient = None
-
+        self.recorder = recorderObject
         self._upload_timer = RepeatedTimer(2,self._upload_timing,run_first=True)
         self._send_M27_timer = RepeatedTimer(10,self._send_M27_timing,run_first=False)
         self._cxapi = CrealityAPI()
         self.connect_thingsboard()
         
-        self.recorder = recorderObject
         self.pipe = "/tmp/rpfifo"
         self.pipein = None
         self.init_pipe()
@@ -204,7 +203,7 @@ class CrealityCloud(object):
             self._iot_connected = self.thingsboard.connect_state
             self.thingsboard.on_server_side_rpc_request = self.on_server_side_rpc_request
             self.thingsboard.client_initialization(region)
-            self._aliprinter = CrealityPrinter(self.plugin, self.lk, self.thingsboard, self.thingsboard_Id, region)
+            self._aliprinter = CrealityPrinter(self.plugin, self.lk, self.thingsboard, self.thingsboard_Id, region, self.recorder)
             self._progress = ProgressMonitor()
             self._aliprinter.printer.register_callback(self._progress)
             self._aliprinter.ipAddress()

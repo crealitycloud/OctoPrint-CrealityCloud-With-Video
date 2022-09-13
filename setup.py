@@ -14,7 +14,7 @@ plugin_package = "octoprint_crealitycloud"
 plugin_name = "OctoPrint-Crealitycloud-With-Video"
 
 # The plugin's version. Can be overwritten within OctoPrint's internal data via __plugin_version__ in the plugin module
-plugin_version = "1.1.0"
+plugin_version = "1.1.1"
 
 # The plugin's description. Can be overwritten within OctoPrint's internal data via __plugin_description__ in the plugin
 # module
@@ -33,7 +33,7 @@ plugin_url = "https://github.com/crealitycloud/OctoPrint-CrealityCloud-With-Vide
 plugin_license = "AGPLv3"
 
 # Any additional requirements besides OctoPrint should be listed here
-plugin_requires = ["OctoPrint>1.3.8", "paho_mqtt", "pyjwt", "ffmpy", "tb-mqtt-client==1.2", "aliyun_python_sdk_vod==2.16.4", "voduploadsdk==1.0.2", "oss2", "websocket_client", "pyav", "aiortc"]
+plugin_requires = ["OctoPrint>1.3.8", "paho_mqtt", "pyjwt", "ffmpy", "tb-mqtt-client==1.2", "aliyun_python_sdk_vod==2.16.4", "voduploadsdk==1.0.2", "oss2", "websocket_client", "av", "aiortc"]
 
 ### --------------------------------------------------------------------------------------------------------------------
 ### More advanced options that you usually shouldn't have to touch follow after this point

@@ -36,9 +36,9 @@ class CrealitycloudPlugin(
         self._addr = None
         self._regionId = None
         self.printing_befor_connect = True
-        self.recorder = Recorder()
 
     def initialize(self):
+        self.recorder = Recorder(self.get_plugin_data_folder())
         self._crealitycloud = CrealityCloud(self, self.recorder)
         self._cxapi = CrealityAPI()
 
@@ -183,7 +183,7 @@ class CrealitycloudPlugin(
 
     @octoprint.plugin.BlueprintPlugin.route("/<date>/<hour>/<filename>", methods=["GET"])
     def get_recorder_file(self, date, hour, filename):
-        file = os.path.expanduser('~') + "/creality_recorder/" + date + "/" + hour + "/" + filename
+        file = self.get_plugin_data_folder() + "/creality_recorder/" + date + "/" + hour + "/" + filename
         range_header = request.headers.get('Range', None)
         byte1, byte2 = 0, None
         if range_header:

@@ -8,12 +8,13 @@ import json
 import sys
 import time
 import logging
+import os
 sys.path.append('../../src/aiortc')
 from octoprint.util import RepeatedTimer
 
 class WebrtcManager():
 
-    def __init__(self,devuceName, our_peer_id, options, close_queue, token, region, verbose=False):
+    def __init__(self,devuceName, our_peer_id, options, close_queue, token, region, recorder, verbose=False):
         self._logger = logging.getLogger("octoprint.plugins.crealitycloud")
         self.our_peer_id = our_peer_id
         self.peers = {}
@@ -28,6 +29,8 @@ class WebrtcManager():
         self.close_queue = close_queue
         self.region = region
         self.count = 0
+        self.recorder = recorder
+        self.filepath = ""
         # self.iceServers = [
         #     {"urls": "stun:stun.l.google.com:19302"},
         #     {"urls": "stun:stun1.l.google.com:19302"},
@@ -56,8 +59,20 @@ class WebrtcManager():
             if(type == "offer"):
                 sdp = sdpMessage["data"]
                 peerId = dict["from"]
+                iceServer = dict["iceServers"]
+                self._logger.info("iceServers:" + str(iceServer))
+                if iceServer is not None:
+                    self.urls = iceServer[0]["urls"]
+                    self.username = iceServer[0]["username"]
+                    self.credential = iceServer[0]["credential"]
                 if 'media' in sdpMessage:
                     media = sdpMessage["media"]
+                    self.filepath = self.recorder.find_video(media)
+                    if os.access(self.filepath,os.F_OK):
+                        self._logger.info("filepath:" + self.filepath)
+                    else:
+                        self._logger.info("filepath not exist")
+                        return
                 else:
                     media = ""
                 if peerId in self.peers:
@@ -116,7 +131,6 @@ class WebrtcManager():
                 "type":None,
                 "mediaplayer":None,
                 "media":media,
-                "recorder":Recorder(),
             }
 
             if(self.options.get("enableDataChannel")):
@@ -207,9 +221,7 @@ class WebrtcManager():
                 #webcam = MediaPlayer(self.options.get('cameraDevice'), format="v4l2", options=options)
                     webcam = MediaPlayer('rtsp://127.0.0.1:8554/ch0_0', format="rtsp", options=options)
                 else:
-                    filepath = peer['recorder'].find_video(peer['media'])
-                    self._logger.info('filepath:' + str(filepath))
-                    webcam = MediaPlayer(filepath)
+                    webcam = MediaPlayer(self.filepath)
         peer['mediaplayer'] = webcam
         peer['localVideoStream'] = webcam.video
         audio = None

@@ -45,7 +45,7 @@ class ErrorCode(Enum):
 
 
 class CrealityPrinter(object):
-    def __init__(self, plugin, lk, thingsboard, tbid, region):
+    def __init__(self, plugin, lk, thingsboard, tbid, region, recorder):
 
         self._logger = logging.getLogger("octoprint.plugins.crealityprinter")
         self._config = CrealityConfig(plugin)
@@ -55,7 +55,7 @@ class CrealityPrinter(object):
         self.printer = plugin._printer
         self.plugin = plugin
         self.Filemanager = self._filecontrol.Filemanager
-        self._boxVersion = "rasp_v2.11b00"
+        self._boxVersion = "rasp_v2.11b01"
         self._state = -1
         self._stop = 0
         self._pause = 0
@@ -100,6 +100,7 @@ class CrealityPrinter(object):
         self.WebSocketClient = None
         self.WebrtcManager = None
         self.region = region
+        self.recorder = recorder
         
     def _upload_data(self, payload):
         if not payload:
@@ -856,7 +857,7 @@ class CrealityPrinter(object):
                 "cameraDevice": "rtsp://127.0.0.1:8554/ch0_0"}
         # websocket_queue = queue.Queue()
         # close_queue = queue.Queue()
-        self.WebrtcManager = WebrtcManager(self._thingsboard_Id, self._thingsboard_Id, webrtcOptions, self.close_queue, self._jwttoken, self.region, verbose=True)
+        self.WebrtcManager = WebrtcManager(self._thingsboard_Id, self._thingsboard_Id, webrtcOptions, self.close_queue, self._jwttoken, self.region, self.recorder, verbose=True)
         self.WebSocketClient = WebSocketClient(URL + self._thingsboard_Id, self.websocket_queue, self._jwttoken)
         self._pc_update_timer = RepeatedTimer(30,self.peerconnection_upadate,run_first=False)
         self._pc_update_timer.start()

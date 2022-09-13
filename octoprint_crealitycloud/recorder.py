@@ -26,15 +26,15 @@ class RepeatingTimer(threading.Timer):
 
 
 class Recorder(object):
-    def __init__(self):
+    def __init__(self, path):
         self.mjpg_stream_url = "http://127.0.0.1/webcam/?action=stream"
         self.timer = None
         self.ffmpeg = None
         self._logger = logging.getLogger("octoprint.plugins.crealitycloudrecorder")
         self._limit_size = 500 # limit size 500MB
         self._printid = None
-        self._recorder_file_path = os.path.expanduser('~') + "/" + "creality_recorder"
-        self._recorder_list_path = os.path.expanduser('~') + "/" + "creality_recorder" + "/" + "vlist.json"
+        self._recorder_file_path = path + "/" + "creality_recorder"
+        self._recorder_list_path = path + "/" + "creality_recorder" + "/" + "vlist.json"
         if not os.path.isdir(self._recorder_file_path):
             os.mkdir(self._recorder_file_path)
         self.ffmpeg_play = None
@@ -230,7 +230,7 @@ class Recorder(object):
                 content = json.load(load_f)
                 return content
         else:
-            return ""
+            return {"cmd": "getRecordList","sn": "1","format": "mp4","playbacks": []}
             
     def add_record_time(self):
         self.check_record_list()
@@ -406,6 +406,7 @@ class Recorder(object):
         except FFRuntimeError as ex:
             if ex.exit_code and ex.exit_code != 1:
                 self._logger.error(ex)
+        self.del_files(filepath)
 
     def find_video(self, path):
         path = path.replace('rec-tick-', '', 1)
@@ -438,3 +439,12 @@ class Recorder(object):
                                     #self.flag = 1
         filepath = self._recorder_file_path + "/" + datepath + "/" + printidpath +"/output.mp4"
         return filepath
+        
+    def del_files(self, path):
+        for root, dirs, files in os.walk(path):
+            for name in files:
+                if name.endswith("output.mp4"):
+                    pass
+                else:
+                    os.remove(os.path.join(root, name))
+                    print("Delete File: " + os.path.join(root, name))
