@@ -55,7 +55,7 @@ class CrealityPrinter(object):
         self.printer = plugin._printer
         self.plugin = plugin
         self.Filemanager = self._filecontrol.Filemanager
-        self._boxVersion = "rasp_v2.11b01"
+        self._boxVersion = "rasp_v2.11b02"
         self._state = -1
         self._stop = 0
         self._pause = 0

@@ -93,7 +93,7 @@ class WebSocketClient:
                                         "device_brand":"raspberry",
                                         "os_version":"linux",
                                         "platform_type":1,
-                                        "app_version":"v1.1.1"
+                                        "app_version":"v1.1.2"
                                     },
                         "token":{
                                     "jwtToken":self.token
