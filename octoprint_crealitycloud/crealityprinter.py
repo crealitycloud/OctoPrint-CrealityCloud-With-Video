@@ -86,6 +86,7 @@ class CrealityPrinter(object):
         self._printTime = 0
         self.gcode_file = None
         self.is_cloud_print = False
+        self._led = -1
         self._logger.info("creality crealityprinter init!")
         self.thingsboard = thingsboard
         self._rpc_requestid = None
@@ -94,7 +95,7 @@ class CrealityPrinter(object):
         self._livestream = None
         self._pullclient = None   
         self._webrtc_thread = None  
-        self._thingsboard_Id =    tbid 
+        self._thingsboard_Id = tbid 
         self.websocket_queue = queue.Queue()
         self.close_queue = queue.Queue()
         self.WebSocketClient = None
@@ -103,6 +104,7 @@ class CrealityPrinter(object):
         self.recorder = recorder
         self._telemetry_msg = {}
         self._attributes_msg = {}
+        self._model = ''
 		        
     def _upload_data(self, payload):
         if not payload:
@@ -156,6 +158,28 @@ class CrealityPrinter(object):
                     self._attributes_msg["print"] = filename
                 except Exception as e:
                     self._logger.error(e)
+    @property
+    def led(self):
+        return self._led
+    
+    @led.setter
+    def led(self, v):
+        if int(v) != int(self._led):
+            self._led = int(v)
+            self._logger.info("led=======" + self._model)
+            if self._led == 1:
+                if self._model == "CR-10 Smart Pro" or self._model == "CR-10 Smart":
+                    # M224 
+                    self.printer.commands(["M224"])
+                else:
+                    self.printer.commands(["M936 LEDSET1"])
+            else:
+                if self._model == "CR-10 Smart Pro" or self._model == "CR-10 Smart":
+                    # M224 
+                    self.printer.commands(["M225"])
+                else:
+                    self.printer.commands(["M936 LEDSET0"])
+            self._attributes_msg["led_state"] = self._led
 
     @property
     def print(self):
@@ -756,7 +780,7 @@ class CrealityPrinter(object):
                 self._webrtc_thread = threading.Thread(target=self.start_webrtc_service)
                 self._webrtc_thread.start()                   
             except Exception as e:
-                self._logger.error(e)                    
+                self._logger.error(e)           
         elif self._webrtc_thread is not None:
             if self._webrtc_thread.is_alive() == False:
                 try:
@@ -826,7 +850,7 @@ class CrealityPrinter(object):
         self._pc_update_timer = RepeatedTimer(30,self.peerconnection_upadate,run_first=False)
         self._pc_update_timer.start()
         try:
-             loop.run_until_complete(
+            loop.run_until_complete(
                 self.websocket_msg_run(self.WebrtcManager, self.WebSocketClient)
             )
         except KeyboardInterrupt:

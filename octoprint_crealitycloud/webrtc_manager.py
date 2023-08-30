@@ -52,7 +52,7 @@ class WebrtcManager():
         # elif(action == "bye"):
         #     peerId = data["from"]
         #     await self.remove_peer(self.peers[peerId])
-
+        
         if(action == "ice_msg"):
             sdpMessage = dict["sdpMessage"]
             type = sdpMessage["type"]    
@@ -333,7 +333,7 @@ class WebrtcManager():
                 if(peer.get('remoteVideoStream')):
                     self._logger.info("### STARTING REMOTE STREAM this is the remote stream",peer.get('remoteVideoStream'))
                     await peer.get('remoteVideoStream').start()
-
+            
             if(description["type"] == 'offer'):
                 await peerConnection.setLocalDescription(await peerConnection.createAnswer())
                 if(self.verbose):
@@ -478,9 +478,9 @@ class WebrtcManager():
 
     def getIceServers(self, deviceName):
         if self.region == 0:
-            url = "https://model-admin.crealitygroup.com/api/cxy/v2/webrtc/iceServersJwt"
+            url = "https://api.crealitycloud.cn/api/cxy/v2/webrtc/iceServersJwt"
         else:
-            url = "https://model-admin2.crealitygroup.com/api/cxy/v2/webrtc/iceServersJwt"
+            url = "https://api.crealitycloud.com/api/cxy/v2/webrtc/iceServersJwt"
         data = '{"deviceName": "' + str(deviceName) + '" }'
         headers = {
             "Content-Type": "application/json",
