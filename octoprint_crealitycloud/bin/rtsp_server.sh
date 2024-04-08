@@ -5,5 +5,7 @@ if [ ! -d $DIR ];then
 else
   cd $DIR
 fi
+
+chmod +x ./rtsp-simple-server
 ./rtsp-simple-server
 #ffmpeg -y -i /dev/video0 -s 640x480 -loglevel quiet -b:v 8000K -vcodec h264_omx -preset veryfast -f rtsp rtsp://127.0.0.1:554/ch0_0
